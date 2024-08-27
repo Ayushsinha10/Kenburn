@@ -1,8 +1,10 @@
+import argparse
 import os
 import requests
 import json
 import cv2
 import numpy as np
+
 from PIL import Image, ImageDraw, ImageFont
 
 
@@ -24,51 +26,57 @@ def download_image(url, save_path):
 
 
 def create_text_image(text, save_path):
-    # Load a font
-    original_font_size = 40  # Original font size
-    new_font_size = original_font_size * 20  # Increase font size by a factor of 20
-    try:
-        font = ImageFont.truetype("arial.ttf", new_font_size)
-    except IOError:
-        font = ImageFont.load_default()
 
-    # Create a temporary image to calculate text size
-    temp_image = Image.new("RGB", (1, 1))
-    draw = ImageDraw.Draw(temp_image)
-    
-    # Calculate text bounding box
-    bbox = draw.textbbox((0, 0), text, font=font)
-    text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
+    image_width = 1920
+    image_height = 1080
 
-    image_width = 1920 # Add some padding
-    image_height = 1080 # Add some padding
-
-    # Create an image with white background
+    # Create an image with a white background
     image = Image.new("RGB", (image_width, image_height), "white")
     draw = ImageDraw.Draw(image)
 
-    # Position for the text
+
+    original_font_size = 80
+    new_font_size = original_font_size
+    
+    try:
+        font = ImageFont.truetype("Roboto-Bold.ttf", new_font_size)
+    except IOError:
+        font = ImageFont.load_default()
+
+
+    while True:
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+
+        # Check if the text fits within the image dimensions
+        if text_width <= image_width and text_height <= image_height:
+            break
+
+
+        new_font_size -= 5
+        font = ImageFont.truetype("Roboto-Bold.ttf", new_font_size)
+
+    # Calculate the position to center the text
     text_position = (
         (image_width - text_width) // 2,
         (image_height - text_height) // 2
     )
 
-    # Add text to image
     draw.text(text_position, text, font=font, fill="black")
 
-    # Save the image
+
     image.save(save_path)
 
 
-
+# Depricated Function
 def write_text_on_image(image_path, text, save_path):
     image = Image.open(image_path)
     draw = ImageDraw.Draw(image)
 
-    # Load a font
-    original_font_size = 40  # Original font size
-    new_font_size = original_font_size * 20  # Increase font size by a factor of 20
+
+    original_font_size = 40  
+    new_font_size = original_font_size * 20 
     try:
         font = ImageFont.truetype("arial.ttf", new_font_size)
     except IOError:
@@ -100,10 +108,10 @@ def write_text_on_image(image_path, text, save_path):
         (image_height - text_height) // 2
     )
     
-    # Add text to image
+
     draw.text(text_position, text, font=font, fill="white")
 
-    # Save the image
+
     image.save(save_path)
 
     print(f"Text '{text}' written to {save_path}")
@@ -127,7 +135,7 @@ def main(data_file_path, download_dir):
             download_image(image_data['large'], save_path)
             if index == 0:
                     description = data.get('description', 'No Description')
-                    write_text_on_image(save_path, description, save_path)
+                   # write_text_on_image(save_path, description, save_path)
                     text_image_save_path = os.path.join(download_dir, 'DESC.jpg')
                     create_text_image(description, text_image_save_path)
                     os.utime('downloads/'+file_name)
@@ -135,27 +143,29 @@ def main(data_file_path, download_dir):
         
         # Process tags if present
         if 'tags' in image_data:
-            for tag_index, tag in enumerate(image_data['tags']):
-                title = tag['title']
-                if 'image' in tag and 'large' in tag['image']:
-                    tag_image_url = tag['image']['large']
-                    tag_file_name = f"{data['title']}_{index+1}_tag_{tag_index+1}_large.jpg"
-                    tag_save_path = os.path.join(download_dir, tag_file_name)
-                    
-                    # Download the tag image
-                    if download_image(tag_image_url, tag_save_path):
-                        # Write title onto the image
-                        write_text_on_image(tag_save_path, title, tag_save_path)
-                        text_image_file_name = f"{data['title']}_{index+1}_tag_{tag_index+1}_title.jpg"
-                        text_image_save_path = os.path.join(download_dir, text_image_file_name)
-                        create_text_image(title, text_image_save_path)
-                        tag_file_name = f"{data['title']}_{index+1}_tag_{tag_index+1}_large.jpg"
-                        os.utime('downloads/'+tag_file_name)
-                    print(f"Title: {title}, Image URL: {tag_image_url}")
+         for tag_index, tag in enumerate(image_data['tags']):
+        # Check if the context is 'feature'
+          if tag.get('context') == 'feature':
+            title = tag['title']
+            if 'image' in tag and 'large' in tag['image']:
+                tag_image_url = tag['image']['large']
+                tag_file_name = f"{data['title']}_{index+1}_tag_{tag_index+1}_large.jpg"
+                tag_save_path = os.path.join(download_dir, tag_file_name)
+                
+                # Download the tag image
+                if download_image(tag_image_url, tag_save_path):
+                    # Write title onto the image
+                   # write_text_on_image(tag_save_path, title, tag_save_path)
+                    text_image_file_name = f"{data['title']}_{index+1}_tag_{tag_index+1}_title.jpg"
+                    text_image_save_path = os.path.join(download_dir, text_image_file_name)
+                    create_text_image(title, text_image_save_path)
+                    os.utime(tag_save_path)  # Update the modification time of the downloaded image file
+            print(f"Title: {title}, Image URL: {tag_image_url}")
 
-def create_slideshow(image_folder, output_video_path, duration_per_image=1, fade_duration=0.6, fps=30):
+def create_slideshow(image_folder, output_video_path, duration_per_image, pan, zoom, fade_duration=0.6, feature_fade_duration=2.0, fps=60):
     image_files = [os.path.join(image_folder, img) for img in os.listdir(image_folder) if img.endswith(('jpg', 'jpeg', 'png'))]
     image_files.sort(key=lambda x: os.path.getmtime(x), reverse=False)
+    
     if not image_files:
         print("No images found in the directory.")
         return
@@ -169,36 +179,127 @@ def create_slideshow(image_folder, output_video_path, duration_per_image=1, fade
 
     for i in range(len(image_files)):
         img = cv2.imread(image_files[i])
-        
-        # Add Ken Burns effect by slightly zooming
-        initial_zoom_factor = 1
-        final_zoom_factor = 1.5
-        for j in range(int(fps * duration_per_image)):
-            zoom_factor = initial_zoom_factor + (final_zoom_factor - initial_zoom_factor) * (j / (fps * duration_per_image))
-            zoomed_img = cv2.resize(img, None, fx=zoom_factor, fy=zoom_factor)
-            x_center, y_center = zoomed_img.shape[1] // 2, zoomed_img.shape[0] // 2
-            x1 = x_center - width // 2
-            y1 = y_center - height // 2
-            zoomed_img = zoomed_img[y1:y1 + height, x1:x1 + width]
-            video.write(zoomed_img)
+        if img is None:
+            print(f"Error loading image: {image_files[i]}")
+            continue
 
-        # Fade-out effect for the current image
+        is_feature = "title" in image_files[i] or (i == 0)
+        
+        if not is_feature:
+            if zoom and pan:
+                # Zoom and pan effect combined
+                initial_zoom_factor = 1
+                final_zoom_factor = 1.5
+                
+                for j in range(int(fps * (duration_per_image/2))):
+                    # Zoom effect
+                    zoom_factor = initial_zoom_factor + (final_zoom_factor - initial_zoom_factor) * (j / (fps * duration_per_image))
+                    zoomed_img = cv2.resize(img, None, fx=zoom_factor, fy=zoom_factor)
+                    x_center, y_center = zoomed_img.shape[1] // 2, zoomed_img.shape[0] // 2
+                    x1 = x_center - width // 2
+                    y1 = y_center - height // 2
+                    zoomed_img = zoomed_img[y1:y1 + height, x1:x1 + width]
+                    
+                    video.write(zoomed_img)
+
+                    # Pan effect
+                pan_start_x = 0
+                pan_end_x = width - int(width * 0.9)  # Pan across 80% of the width
+                    
+                for j in range(int(fps * (duration_per_image / 2))):  # The other half of the duration for panning
+                    pan_x = int(pan_start_x + (pan_end_x - pan_start_x) * (j / (fps * (duration_per_image / 2))))
+                    panned_img = zoomed_img[:, pan_x:pan_x + int(width * 0.8)]
+                    panned_img = cv2.resize(panned_img, (width, height))
+
+                    video.write(panned_img)
+            elif pan:
+                # Pan effect only
+                pan_start_x = 0
+                pan_end_x = width - int(width * 0.8)  # Pan across 80% of the width
+    
+                for j in range(int(fps * duration_per_image)):
+                  pan_x = int(pan_start_x + (pan_end_x - pan_start_x) * (j / (fps * duration_per_image)))
+                  pan_x = max(0, min(pan_x, width - int(width * 0.8)))
+                  panned_img = img[:, pan_x:pan_x + int(width * 0.8)]
+
+                  panned_img = cv2.resize(panned_img, (width, height), interpolation=cv2.INTER_LINEAR)
+        
+                  video.write(panned_img)
+            elif zoom:
+                # Zoom effect only
+                initial_zoom_factor = 1
+                final_zoom_factor = 1.5
+                for j in range(int(fps * duration_per_image)):
+                    zoom_factor = initial_zoom_factor + (final_zoom_factor - initial_zoom_factor) * (j / (fps * duration_per_image))
+                    zoomed_img = cv2.resize(img, None, fx=zoom_factor, fy=zoom_factor)
+                    x_center, y_center = zoomed_img.shape[1] // 2, zoomed_img.shape[0] // 2
+                    x1 = x_center - width // 2
+                    y1 = y_center - height // 2
+                    zoomed_img = zoomed_img[y1:y1 + height, x1:x1 + width]
+                    video.write(zoomed_img)
+
+            else:
+                # No pan or zoom effect
+                for j in range(int(fps * duration_per_image)):
+                    video.write(img)
+        
+        else:
+            # No zoom or pan effect for feature images
+            for j in range(int(fps * duration_per_image)):
+                video.write(img)
+        
         if i < len(image_files) - 1:
             next_img = cv2.imread(image_files[i + 1])
-            for k in range(int(fps * fade_duration)):
-                alpha = k / (fps * fade_duration)
-                blended_img = cv2.addWeighted(zoomed_img, 1 - alpha, next_img, alpha, 0)
+            if next_img is None:
+                print(f"Error loading next image: {image_files[i + 1]}")
+                continue
+
+            fade_duration_for_transition = feature_fade_duration if is_feature else fade_duration
+            
+            for k in range(int(fps * fade_duration_for_transition)):
+                alpha = k / (fps * fade_duration_for_transition)
+                
+                if is_feature:
+                    background_img = next_img
+                    blended_img = cv2.addWeighted(background_img, alpha, img, 1 - alpha, 0)
+                else:
+                    # Normal fade transition
+                    blended_img = cv2.addWeighted(img, 1 - alpha, next_img, alpha, 0)
+                    
                 video.write(blended_img)
-    
+
     video.release()
     print(f"Video slideshow created at {output_video_path}")
 
 if __name__ == "__main__":
-    data_file_path = 'data/FL70JZX.txt'
-    download_dir = 'downloads'
-    output_video_path = 'slideshow.mp4'
-    if not os.path.exists(download_dir):
-        os.makedirs(download_dir)
-    main(data_file_path, download_dir)
-    
-    create_slideshow(download_dir, output_video_path)
+    parser = argparse.ArgumentParser(description="Process images and create a slideshow video.")
+
+    parser.add_argument("data_file_path", type=str, help="Path to the data file (e.g., 'data/FL70JZX.txt').")
+    parser.add_argument("download_dir", type=str, help="Directory to save downloaded images (e.g., 'downloads').")
+    parser.add_argument("output_video_path", type=str, help="Path to save the output slideshow video (e.g., 'slideshow.mp4').")
+    parser.add_argument("duration_image", type=int, help="How long each image stays on frame in seconds(e.g, '1'').")
+    parser.add_argument("--pan", action="store_true", help="Add pan effect to images.")
+    parser.add_argument("--zoom", action="store_true", help="Add zoom effect to images.")
+
+    args = parser.parse_args()
+
+    # Verification checks
+    if not os.path.isfile(args.data_file_path):
+        print(f"Error: The data file '{args.data_file_path}' does not exist.")
+        exit(1)
+
+    if not os.path.isdir(args.download_dir):
+        print(f"Warning: The download directory '{args.download_dir}' does not exist. Creating it now.")
+        os.makedirs(args.download_dir)
+
+    if not args.output_video_path.endswith('.mp4'):
+        print("Error: The output video path must end with '.mp4'.")
+        exit(1)
+
+
+
+
+    main(args.data_file_path, args.download_dir)
+
+
+    create_slideshow(args.download_dir, args.output_video_path, args.duration_image, args.pan, args.zoom)
