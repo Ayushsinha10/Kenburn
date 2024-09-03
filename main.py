@@ -115,6 +115,8 @@ def write_text_on_image(image_path, text, save_path):
     image.save(save_path)
 
     print(f"Text '{text}' written to {save_path}")
+    
+
 
 
 # Main function to handle the downloading of images
@@ -161,6 +163,22 @@ def main(data_file_path, download_dir):
                     create_text_image(title, text_image_save_path)
                     os.utime(tag_save_path)  # Update the modification time of the downloaded image file
             print(f"Title: {title}, Image URL: {tag_image_url}")
+def pad_image_to_size(img, target_width, target_height):
+
+    height, width = img.shape[:2]
+    top = (target_height - height) // 2
+    bottom = target_height - height - top
+    left = (target_width - width) // 2
+    right = target_width - width - left
+    
+    # Pad the image with black borders
+    padded_img = cv2.copyMakeBorder(
+        img,
+        top, bottom, left, right,
+        cv2.BORDER_CONSTANT,
+        value=[0, 0, 0]  # Black color
+    )
+    return padded_img
 
 def create_slideshow(image_folder, output_video_path, duration_per_image, pan, zoom, fade_duration=0.6, feature_fade_duration=2.0, fps=60):
     image_files = [os.path.join(image_folder, img) for img in os.listdir(image_folder) if img.endswith(('jpg', 'jpeg', 'png'))]
@@ -204,12 +222,12 @@ def create_slideshow(image_folder, output_video_path, duration_per_image, pan, z
 
                     # Pan effect
                 pan_start_x = 0
-                pan_end_x = width - int(width * 0.9)  # Pan across 80% of the width
+                pan_end_x = width - int(width * 0.9)  
                     
                 for j in range(int(fps * (duration_per_image / 2))):  # The other half of the duration for panning
                     pan_x = int(pan_start_x + (pan_end_x - pan_start_x) * (j / (fps * (duration_per_image / 2))))
                     panned_img = zoomed_img[:, pan_x:pan_x + int(width * 0.8)]
-                    panned_img = cv2.resize(panned_img, (width, height))
+                    panned_img = pad_image_to_size(panned_img, 1920, 1080)
 
                     video.write(panned_img)
             elif pan:
@@ -222,7 +240,7 @@ def create_slideshow(image_folder, output_video_path, duration_per_image, pan, z
                   pan_x = max(0, min(pan_x, width - int(width * 0.8)))
                   panned_img = img[:, pan_x:pan_x + int(width * 0.8)]
 
-                  panned_img = cv2.resize(panned_img, (width, height), interpolation=cv2.INTER_LINEAR)
+                  panned_img = pad_image_to_size(panned_img, 1920, 1080)
         
                   video.write(panned_img)
             elif zoom:
